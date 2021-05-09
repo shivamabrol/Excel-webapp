@@ -1,71 +1,69 @@
-import pandas as pd
 import streamlit as st
-import plotly.express as px
-from PIL import Image
+import pandas as pd
+import numpy as np
+import pickle
+from sklearn.ensemble import RandomForestClassifier
 
-st.set_page_config(page_title='Survey Results')
-st.header('Survey Results 2021')
-st.subheader('Was the tutorial helpful?')
+st.write("""
+# Heart Disease Prediction App
 
-### --- LOAD DATAFRAME
-excel_file = 'Survey_Results.xlsx'
-sheet_name = 'DATA'
+    On the basis of the given factors this app can predict if you
+    have heart disease
+""")
 
-df = pd.read_excel(excel_file,
-                   sheet_name=sheet_name,
-                   usecols='B:D',
-                   header=3)
+st.sidebar.header('User Input Features')
 
-df_participants = pd.read_excel(excel_file,
-                                sheet_name= sheet_name,
-                                usecols='F:G',
-                                header=3)
-df_participants.dropna(inplace=True)
+def user_input_features():
+    age = st.sidebar.slider('Age', 1, 99, 18)
+    sex = st.sidebar.selectbox('Sex',('male','female'))
+    if(sex == 'male'):
+        sex = 0
+    else:
+        sex = '1'
 
-# --- STREAMLIT SELECTION
-department = df['Department'].unique().tolist()
-ages = df['Age'].unique().tolist()
+    cp = st.sidebar.selectbox('Constrictive pericarditis',('0', '1', '2', '3'))
+    trtbps = st.sidebar.slider('TRTBPS', 90, 200,150)
+    chol = st.sidebar.slider('Cholestrol', 120,600,250)
+    fbs = st.sidebar.selectbox('FBS', ('0', '1'))
+    rest_ecg = st.sidebar.selectbox('Rest ECG', ('0', '1', '2'))
+    thalachh = st.sidebar.slider('Thal Acch', 50, 250, 100)
+    exng = st.sidebar.selectbox('Exchange ', ('0', '1'))
+    oldpeak = st.sidebar.slider('Old Peak', 0, 200, 100)
+    oldpeak /= 100
+    slp = st.sidebar.selectbox('SLP', ('0', '1', '2'))
+    caa = st.sidebar.selectbox('CAA', ('0', '1', '2', '3', '4'))
+    thall = st.sidebar.selectbox('Thall', ('0', '1', '2', '3'))
+    data = {'age': age,
+                'sex': sex,
+                'cp': cp,
+                'trtbps': trtbps,
+                'chol': chol,
+                'fbs': fbs,
+                'restecg': rest_ecg,
+                'thalachh': thalachh,
+                'exng': exng,
+                'oldpeak': oldpeak,
+                'slp': slp,
+                'caa': caa,
+                'thall': thall
+                }
+    features = pd.DataFrame(data, index=[0])
+    return features
+input_df = user_input_features()
 
-age_selection = st.slider('Age:',
-                        min_value= min(ages),
-                        max_value= max(ages),
-                        value=(min(ages),max(ages)))
 
-department_selection = st.multiselect('Department:',
-                                    department,
-                                    default=department)
 
-# --- FILTER DATAFRAME BASED ON SELECTION
-mask = (df['Age'].between(*age_selection)) & (df['Department'].isin(department_selection))
-number_of_result = df[mask].shape[0]
-st.markdown(f'*Available Results: {number_of_result}*')
 
-# --- GROUP DATAFRAME AFTER SELECTION
-df_grouped = df[mask].groupby(by=['Rating']).count()[['Age']]
-df_grouped = df_grouped.rename(columns={'Age': 'Votes'})
-df_grouped = df_grouped.reset_index()
+# Reads in saved classification model
+load_clf = pickle.load(open('heardisease.pkl', 'rb'))
 
-# --- PLOT BAR CHART
-bar_chart = px.bar(df_grouped,
-                   x='Rating',
-                   y='Votes',
-                   text='Votes',
-                   color_discrete_sequence = ['#F63366']*len(df_grouped),
-                   template= 'plotly_white')
-st.plotly_chart(bar_chart)
+# Apply model to make predictions
+prediction = load_clf.predict(input_df)
 
-# --- DISPLAY IMAGE & DATAFRAME
-col1, col2 = st.beta_columns(2)
-image = Image.open('images/survey.jpg')
-col1.image(image,
-        caption='Designed by slidesgo / Freepik',
-        use_column_width=True)
-col2.dataframe(df[mask])
 
-# --- PLOT PIE CHART
-pie_chart = px.pie(df_participants,
-                title='Total No. of Participants',
-                values='Participants',
-                names='Departments')
+st.subheader('Prediction')
+if(prediction == 0):
+    st.write('You do not have health disease')
+else:
+    st.write('You might have health disease')
 
-st.plotly_chart(pie_chart)
